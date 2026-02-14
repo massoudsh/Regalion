@@ -1,0 +1,409 @@
+"""
+API Views for AML System
+"""
+import logging
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
+from django.db.models import Q
+from django.http import FileResponse
+
+from .models import Customer, Transaction, Alert, RiskScore, Rule, Report
+from .serializers import (
+    CustomerSerializer, TransactionSerializer, AlertSerializer,
+    RiskScoreSerializer, RuleSerializer, ReportSerializer,
+    MonitorTransactionSerializer, ReviewAlertSerializer, GenerateReportSerializer
+)
+from .services.transaction_monitor import get_transaction_monitor
+from .services.alert_generator import get_alert_generator
+from .services.report_generator import get_report_generator
+
+logger = logging.getLogger('aml')
+
+
+class CustomerViewSet(viewsets.ModelViewSet):
+    """ViewSet for Customer model"""
+    queryset = Customer.objects.all()
+    serializer_class = CustomerSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'customer_id'
+    
+    def get_queryset(self):
+        queryset = Customer.objects.all()
+        
+        # Filter by risk level
+        risk_level = self.request.query_params.get('risk_level', None)
+        if risk_level:
+            queryset = queryset.filter(current_risk_level=risk_level)
+        
+        # Filter by customer type
+        customer_type = self.request.query_params.get('customer_type', None)
+        if customer_type:
+            queryset = queryset.filter(customer_type=customer_type)
+        
+        # Search by name or email
+        search = self.request.query_params.get('search', None)
+        if search:
+            queryset = queryset.filter(
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(email__icontains=search) |
+                Q(customer_id__icontains=search)
+            )
+        
+        return queryset
+    
+    @action(detail=True, methods=['get'])
+    def risk_scores(self, request, customer_id=None):
+        """Get risk scores for a customer"""
+        customer = self.get_object()
+        risk_scores = RiskScore.objects.filter(customer=customer).order_by('-calculated_at')
+        serializer = RiskScoreSerializer(risk_scores, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'])
+    def alerts(self, request, customer_id=None):
+        """Get alerts for a customer"""
+        customer = self.get_object()
+        alerts = Alert.objects.filter(customer=customer).order_by('-created_at')
+        serializer = AlertSerializer(alerts, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'])
+    def transactions(self, request, customer_id=None):
+        """Get transactions for a customer"""
+        customer = self.get_object()
+        transactions = Transaction.objects.filter(customer=customer).order_by('-transaction_date')
+        serializer = TransactionSerializer(transactions, many=True)
+        return Response(serializer.data)
+
+
+class TransactionViewSet(viewsets.ModelViewSet):
+    """ViewSet for Transaction model"""
+    queryset = Transaction.objects.all()
+    serializer_class = TransactionSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'transaction_id'
+    
+    def get_queryset(self):
+        queryset = Transaction.objects.all()
+        
+        # Filter by suspicious
+        is_suspicious = self.request.query_params.get('is_suspicious', None)
+        if is_suspicious is not None:
+            queryset = queryset.filter(is_suspicious=is_suspicious.lower() == 'true')
+        
+        # Filter by transaction type
+        transaction_type = self.request.query_params.get('transaction_type', None)
+        if transaction_type:
+            queryset = queryset.filter(transaction_type=transaction_type)
+        
+        # Filter by date range
+        date_from = self.request.query_params.get('date_from', None)
+        date_to = self.request.query_params.get('date_to', None)
+        if date_from:
+            queryset = queryset.filter(transaction_date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(transaction_date__lte=date_to)
+        
+        return queryset
+    
+    @action(detail=False, methods=['post'], url_path='monitor')
+    def monitor_transaction(self, request):
+        """Monitor a transaction and generate alerts if needed"""
+        serializer = MonitorTransactionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        transaction_id = serializer.validated_data['transaction_id']
+        
+        try:
+            transaction = Transaction.objects.get(transaction_id=transaction_id)
+        except Transaction.DoesNotExist:
+            return Response(
+                {'error': f'Transaction {transaction_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Monitor transaction
+        monitor = get_transaction_monitor()
+        result = monitor.monitor_transaction(transaction)
+        
+        # Generate alert if needed
+        alert = None
+        if result['should_alert']:
+            alert_generator = get_alert_generator()
+            
+            # Get triggered rules
+            from .rules.aml_rules import get_rule_engine
+            rule_engine = get_rule_engine()
+            triggered_rules, reasons, _ = rule_engine.evaluate_transaction(transaction)
+            
+            alert = alert_generator.generate_alert(
+                transaction=transaction,
+                triggered_rules=triggered_rules,
+                risk_score=result['risk_score'],
+                severity=result['alert_severity'],
+                reasons=reasons
+            )
+        
+        response_data = {
+            'monitoring_result': result,
+            'alert': AlertSerializer(alert).data if alert else None
+        }
+        
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
+class AlertViewSet(viewsets.ModelViewSet):
+    """ViewSet for Alert model"""
+    queryset = Alert.objects.all()
+    serializer_class = AlertSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'alert_id'
+    
+    def get_queryset(self):
+        queryset = Alert.objects.all()
+        
+        # Filter by status
+        alert_status = self.request.query_params.get('status', None)
+        if alert_status:
+            queryset = queryset.filter(status=alert_status)
+        
+        # Filter by severity
+        severity = self.request.query_params.get('severity', None)
+        if severity:
+            queryset = queryset.filter(severity=severity)
+        
+        return queryset
+    
+    @action(detail=True, methods=['post'], url_path='review')
+    def review_alert(self, request, alert_id=None):
+        """Review an alert"""
+        alert = self.get_object()
+        serializer = ReviewAlertSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        alert_generator = get_alert_generator()
+        reviewer = request.user.username if hasattr(request.user, 'username') else 'system'
+        
+        status_value = serializer.validated_data['status']
+        notes = serializer.validated_data['notes']
+        
+        if status_value == 'ESCALATED':
+            alert = alert_generator.escalate_alert(alert, reviewer, notes)
+        elif status_value == 'FALSE_POSITIVE':
+            alert = alert_generator.mark_false_positive(alert, reviewer, notes)
+        else:
+            alert = alert_generator.review_alert(alert, reviewer, status_value, notes)
+        
+        return Response(AlertSerializer(alert).data)
+    
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        """Get alert statistics"""
+        alert_generator = get_alert_generator()
+        days = int(request.query_params.get('days', 30))
+        stats = alert_generator.get_alerts_statistics(days=days)
+        return Response(stats)
+    
+    @action(detail=False, methods=['get'])
+    def open_count(self, request):
+        """Get count of open alerts by severity"""
+        alert_generator = get_alert_generator()
+        counts = alert_generator.get_open_alerts_count()
+        return Response(counts)
+
+
+class RiskScoreViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet for RiskScore model (read-only)"""
+    queryset = RiskScore.objects.all()
+    serializer_class = RiskScoreSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        queryset = RiskScore.objects.all()
+        
+        # Filter by customer
+        customer_id = self.request.query_params.get('customer_id', None)
+        if customer_id:
+            queryset = queryset.filter(customer__customer_id=customer_id)
+        
+        # Filter by score type
+        score_type = self.request.query_params.get('score_type', None)
+        if score_type:
+            queryset = queryset.filter(score_type=score_type)
+        
+        return queryset
+
+
+class RuleViewSet(viewsets.ModelViewSet):
+    """ViewSet for Rule model"""
+    queryset = Rule.objects.all()
+    serializer_class = RuleSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        queryset = Rule.objects.all()
+        
+        # Filter by status
+        rule_status = self.request.query_params.get('status', None)
+        if rule_status:
+            queryset = queryset.filter(status=rule_status)
+        
+        # Filter by rule type
+        rule_type = self.request.query_params.get('rule_type', None)
+        if rule_type:
+            queryset = queryset.filter(rule_type=rule_type)
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user.username if hasattr(self.request.user, 'username') else 'system')
+
+
+class ReportViewSet(viewsets.ModelViewSet):
+    """ViewSet for Report model"""
+    queryset = Report.objects.all()
+    serializer_class = ReportSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'report_id'
+    
+    def get_queryset(self):
+        queryset = Report.objects.all()
+        
+        # Filter by report type
+        report_type = self.request.query_params.get('report_type', None)
+        if report_type:
+            queryset = queryset.filter(report_type=report_type)
+        
+        # Filter by status
+        report_status = self.request.query_params.get('status', None)
+        if report_status:
+            queryset = queryset.filter(status=report_status)
+        
+        return queryset
+    
+    @action(detail=False, methods=['post'], url_path='generate')
+    def generate_report(self, request):
+        """Generate a new report"""
+        serializer = GenerateReportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        report_type = serializer.validated_data['report_type']
+        period_start = serializer.validated_data['period_start']
+        period_end = serializer.validated_data['period_end']
+        file_format = serializer.validated_data.get('format', 'JSON')
+        submitted_by = request.user.username if hasattr(request.user, 'username') else 'system'
+        
+        report_generator = get_report_generator()
+        
+        try:
+            if report_type == 'SAR':
+                # Get alerts in the period
+                alerts = Alert.objects.filter(
+                    created_at__gte=period_start,
+                    created_at__lte=period_end
+                )
+                
+                if not alerts.exists():
+                    return Response(
+                        {'error': 'No alerts found in the specified period'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                report = report_generator.generate_sar(
+                    alerts=list(alerts),
+                    period_start=period_start,
+                    period_end=period_end,
+                    submitted_by=submitted_by
+                )
+            
+            elif report_type == 'CTR':
+                threshold = serializer.validated_data.get('threshold', None)
+                if not threshold:
+                    return Response(
+                        {'error': 'Threshold is required for CTR reports'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Get transactions exceeding threshold
+                transactions = Transaction.objects.filter(
+                    transaction_date__gte=period_start,
+                    transaction_date__lte=period_end,
+                    amount__gte=threshold,
+                    status='COMPLETED'
+                )
+                
+                if not transactions.exists():
+                    return Response(
+                        {'error': 'No transactions found exceeding the threshold'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                report = report_generator.generate_ctr(
+                    transactions=list(transactions),
+                    period_start=period_start,
+                    period_end=period_end,
+                    threshold=threshold,
+                    submitted_by=submitted_by
+                )
+            
+            else:
+                return Response(
+                    {'error': f'Report type {report_type} not implemented'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Export to requested format
+            if file_format == 'JSON':
+                report_generator.export_report_json(report)
+            elif file_format == 'CSV':
+                report_generator.export_report_csv(report)
+            elif file_format == 'PDF':
+                report_generator.export_report_pdf(report)
+            
+            return Response(ReportSerializer(report).data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Error generating report: {str(e)}")
+            return Response(
+                {'error': f'Error generating report: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['get'])
+    def download(self, request, report_id=None):
+        """Download report file"""
+        report = self.get_object()
+        
+        if not report.file_path:
+            return Response(
+                {'error': 'Report file not generated'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        try:
+            return FileResponse(
+                open(report.file_path, 'rb'),
+                as_attachment=True,
+                filename=f"{report.report_id}.{report.file_format.lower()}"
+            )
+        except FileNotFoundError:
+            return Response(
+                {'error': 'Report file not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=True, methods=['post'])
+    def submit(self, request, report_id=None):
+        """Submit report to regulatory body"""
+        report = self.get_object()
+        regulatory_body = request.data.get('regulatory_body', '')
+        
+        report_generator = get_report_generator()
+        report = report_generator.submit_report(report, regulatory_body)
+        
+        return Response(ReportSerializer(report).data)
+
