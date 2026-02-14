@@ -1,23 +1,13 @@
 """
-Django settings for RegTech AML System.
+Django base settings for RegTech AML System.
+Shared across development and production. Do not put secrets here.
 """
-
 from pathlib import Path
 from decouple import config
 import os
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-this-in-production')
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=True, cast=bool)
-
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',')])
-
-# Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -39,7 +29,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'aml.middleware.AuditTrailMiddleware',  # Audit trail logging
+    'aml.middleware.AuditTrailMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -62,10 +52,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database
-# Use SQLite for development if PostgreSQL is not available
 USE_POSTGRES = config('USE_POSTGRES', default=False, cast=bool)
-
 if USE_POSTGRES:
     DATABASES = {
         'default': {
@@ -85,36 +72,23 @@ else:
         }
     }
 
-# Password validation
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# Internationalization
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
@@ -129,30 +103,21 @@ REST_FRAMEWORK = {
     ],
 }
 
-# CORS settings
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
     default='http://localhost:3000,http://localhost:8000',
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
 
-# Celery Configuration (optional for async processing)
 CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')
 
-# Logging configuration for audit trail
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
-            'style': '{',
-        },
-        'audit': {
-            'format': '{asctime} | {levelname} | {module} | {message}',
-            'style': '{',
-        },
+        'verbose': {'format': '{levelname} {asctime} {module} {message}', 'style': '{'},
+        'audit': {'format': '{asctime} | {levelname} | {module} | {message}', 'style': '{'},
     },
     'handlers': {
         'file': {
@@ -174,19 +139,8 @@ LOGGING = {
         },
     },
     'loggers': {
-        'django': {
-            'handlers': ['file', 'console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'aml': {
-            'handlers': ['file', 'audit_file', 'console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
+        'django': {'handlers': ['file', 'console'], 'level': 'INFO', 'propagate': False},
+        'aml': {'handlers': ['file', 'audit_file', 'console'], 'level': 'INFO', 'propagate': False},
     },
 }
-
-# Create logs directory if it doesn't exist
 os.makedirs(BASE_DIR / 'logs', exist_ok=True)
-

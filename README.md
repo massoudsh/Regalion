@@ -60,10 +60,20 @@ python manage.py createsuperuser
 python manage.py create_sample_rules
 ```
 
-8. اجرای سرور:
+8. اجرای سرور (به‌صورت پیش‌فرض با تنظیمات development):
 ```bash
-python manage.py runserver
+# از ریشه پروژه با Make
+make run
+
+# یا از پوشه backend
+cd backend && python manage.py runserver
 ```
+
+برای محیط production از همان پوشه:
+```bash
+DJANGO_ENV=production python manage.py runserver
+```
+یا `make run-prod` (از ریشه پروژه).
 
 ## ساختار پروژه
 
@@ -77,10 +87,23 @@ RegTech/
 │   │   ├── services/           # Business logic
 │   │   ├── rules/              # Rule engine
 │   │   └── ml/                 # ML models (optional)
-│   ├── config/                 # Django settings
+│   ├── config/
+│   │   ├── settings/           # Django settings (base, development, production)
+│   │   │   ├── base.py
+│   │   │   ├── development.py
+│   │   │   └── production.py
+│   │   └── urls.py
 │   └── requirements.txt
+├── Makefile                    # make run, make migrate, make test
+├── ROADMAP.md                  # Development roadmap & timeline
 └── README.md
 ```
+
+### Django settings (best practice)
+
+- **Development (default):** `DJANGO_ENV=development` یا مقدار ندادن — DEBUG=True، SQLite مجاز.
+- **Production:** `DJANGO_ENV=production` — DEBUG=False، security headers، فقط JSON API.
+- تنظیمات مشترک در `config/settings/base.py`؛ مخصوص محیط در `development.py` و `production.py`.
 
 ## API Endpoints
 

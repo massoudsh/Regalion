@@ -64,3 +64,6 @@ celerybeat.pid
 *.pem
 *.key
 .env
+
+# Docs / assets (keep repo code-only; store PDFs locally if needed)
+*.pdf
