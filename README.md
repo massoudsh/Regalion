@@ -1,4 +1,4 @@
-# RegTech AML System
+# Regalion AML System
 
 سیستم Anti Money Laundering (AML) برای نظارت بر تراکنش‌ها، تشخیص فعالیت‌های مشکوک و گزارش‌دهی به رگولاتور.
 
@@ -24,7 +24,7 @@
 1. کلون کردن پروژه:
 ```bash
 git clone <repository-url>
-cd RegTech
+cd Regalion
 ```
 
 2. ایجاد محیط مجازی:
@@ -78,7 +78,7 @@ DJANGO_ENV=production python manage.py runserver
 ## ساختار پروژه
 
 ```
-RegTech/
+Regalion/
 ├── backend/
 │   ├── aml/                    # Django app اصلی AML
 │   │   ├── models.py           # Customer, Transaction, Alert, RiskScore

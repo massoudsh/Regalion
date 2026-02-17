@@ -1,4 +1,4 @@
-# RegTech AML - Git ignore
+# Regalion AML - Git ignore
 # Python
 __pycache__/
 *.py[cod]

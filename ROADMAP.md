@@ -1,4 +1,4 @@
-# RegTech AML — Development Roadmap
+# Regalion AML — Development Roadmap
 
 Timeline and priorities for development, UI/UX, and enhancements. Use this with GitHub Issues and Milestones for tracking.
 
@@ -16,6 +16,8 @@ Timeline and priorities for development, UI/UX, and enhancements. Use this with 
 | P1 | Unit tests for core services (rules, risk scorer, monitor) | Week 2 | pytest or Django TestCase |
 
 **Reminder:** End of Week 1 — confirm settings split and run commands. End of Week 2 — tests green and health endpoints live.
+
+**Done:** Settings split, security (prod), Makefile, health/ready endpoints, API schema (with uritemplate), unit tests for rules/risk_scorer/transaction_monitor + health/ready.
 
 ---
 

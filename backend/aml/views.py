@@ -5,10 +5,11 @@ import logging
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.utils import timezone
 from django.db.models import Q
 from django.http import FileResponse
+from django.shortcuts import render
 
 from .models import Customer, Transaction, Alert, RiskScore, Rule, Report
 from .serializers import (
@@ -21,6 +22,17 @@ from .services.alert_generator import get_alert_generator
 from .services.report_generator import get_report_generator
 
 logger = logging.getLogger('aml')
+
+
+def dashboard_view(request):
+    """Root UI: Regalion AML dashboard (counts + links)."""
+    context = {
+        'customers': Customer.objects.count(),
+        'transactions': Transaction.objects.count(),
+        'alerts_open': Alert.objects.filter(status='OPEN').count(),
+        'rules': Rule.objects.count(),
+    }
+    return render(request, 'aml/dashboard.html', context)
 
 
 class CustomerViewSet(viewsets.ModelViewSet):
@@ -406,4 +418,34 @@ class ReportViewSet(viewsets.ModelViewSet):
         report = report_generator.submit_report(report, regulatory_body)
         
         return Response(ReportSerializer(report).data)
+
+
+# --- Health & readiness (no auth for load balancers) ---
+
+from rest_framework.views import APIView
+from django.db import connection
+
+
+class HealthView(APIView):
+    """GET /api/health/ — liveness (app is up)."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({'status': 'ok', 'service': 'regalion-aml'})
+
+
+class ReadyView(APIView):
+    """GET /api/ready/ — readiness (app can serve traffic, DB reachable)."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute('SELECT 1')
+            return Response({'status': 'ready', 'database': 'ok'})
+        except Exception as e:
+            return Response(
+                {'status': 'not_ready', 'database': 'error', 'detail': str(e)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
 

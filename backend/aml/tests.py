@@ -2,7 +2,7 @@
 Tests for AML System
 """
 from decimal import Decimal
-from django.test import TestCase
+from django.test import TestCase, Client
 from django.utils import timezone
 from datetime import timedelta
 
@@ -12,6 +12,25 @@ from .services.risk_scorer import get_risk_scorer
 from .services.alert_generator import get_alert_generator
 from .services.report_generator import get_report_generator
 from .rules.aml_rules import get_rule_engine
+
+
+class HealthReadyTest(TestCase):
+    """Test health and readiness endpoints (no auth)."""
+
+    def setUp(self):
+        self.client = Client()
+
+    def test_health_returns_ok(self):
+        r = self.client.get('/api/health/')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['status'], 'ok')
+        self.assertIn('service', r.json())
+
+    def test_ready_returns_ready_when_db_ok(self):
+        r = self.client.get('/api/ready/')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['status'], 'ready')
+        self.assertEqual(r.json()['database'], 'ok')
 
 
 class CustomerModelTest(TestCase):

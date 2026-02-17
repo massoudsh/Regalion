@@ -1,5 +1,5 @@
 """
-WSGI config for RegTech AML System.
+WSGI config for Regalion AML System.
 """
 
 import os

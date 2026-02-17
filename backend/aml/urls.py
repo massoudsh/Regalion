@@ -14,6 +14,8 @@ router.register(r'rules', views.RuleViewSet, basename='rule')
 router.register(r'reports', views.ReportViewSet, basename='report')
 
 urlpatterns = [
+    path('health/', views.HealthView.as_view()),
+    path('ready/', views.ReadyView.as_view()),
     path('', include(router.urls)),
 ]
 

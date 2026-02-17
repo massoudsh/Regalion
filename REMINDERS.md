@@ -1,4 +1,4 @@
-# RegTech — Reminders & Timeline
+# Regalion — Reminders & Timeline
 
 Use this with **ROADMAP.md** and **GitHub Issues/Milestones**. Set calendar or task reminders for the following.
 
@@ -37,10 +37,10 @@ Use this with **ROADMAP.md** and **GitHub Issues/Milestones**. Set calendar or t
 cat ROADMAP.md
 
 # List open issues (after gh is configured)
-gh issue list --repo massoudsh/RegTech
+gh issue list --repo massoudsh/Regalion
 
 # Run app (Django best practice)
 make run
 ```
 
-Set your own calendar reminders (e.g. “RegTech Phase 1 review”) at the end of each phase.
+Set your own calendar reminders (e.g. “Regalion Phase 1 review”) at the end of each phase.

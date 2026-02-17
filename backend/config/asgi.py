@@ -1,5 +1,5 @@
 """
-ASGI config for RegTech AML System.
+ASGI config for Regalion AML System.
 """
 
 import os

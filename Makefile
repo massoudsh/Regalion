@@ -1,4 +1,4 @@
-# RegTech AML — Django best-practice run targets
+# Regalion AML — Django best-practice run targets
 # Usage: make run | make migrate | make test | make prod-run
 
 PYTHON ?= python3
@@ -9,7 +9,7 @@ VENV_BIN = $(VENV)/bin
 .PHONY: help venv install migrate run run-prod test shell createsuperuser collectstatic create-sample-rules
 
 help:
-	@echo "RegTech AML — targets: venv, install, migrate, run, run-prod, test, shell, createsuperuser, collectstatic, create-sample-rules"
+	@echo "Regalion AML — targets: venv, install, migrate, run, run-prod, test, shell, createsuperuser, collectstatic, create-sample-rules"
 
 venv:
 	$(PYTHON) -m venv $(VENV)

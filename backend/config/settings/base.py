@@ -1,5 +1,5 @@
 """
-Django base settings for RegTech AML System.
+Django base settings for Regalion AML System.
 Shared across development and production. Do not put secrets here.
 """
 from pathlib import Path
@@ -57,7 +57,7 @@ if USE_POSTGRES:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': config('DB_NAME', default='regtech_aml'),
+            'NAME': config('DB_NAME', default='regalion_aml'),
             'USER': config('DB_USER', default='postgres'),
             'PASSWORD': config('DB_PASSWORD', default='postgres'),
             'HOST': config('DB_HOST', default='localhost'),
