@@ -107,6 +107,29 @@ Regalion/
 
 ## API Endpoints
 
+### API Authentication (Token)
+
+API requests require authentication. Use **Token Authentication** (DRF):
+
+1. **Obtain a token** (POST with a valid Django user):
+   ```bash
+   curl -X POST http://localhost:8000/api/auth/token/ \
+     -H "Content-Type: application/json" \
+     -d '{"username": "your_username", "password": "your_password"}'
+   ```
+   Response: `{"token": "abc123..."}`
+
+2. **Call API** with the token:
+   ```bash
+   curl -H "Authorization: Token abc123..." http://localhost:8000/api/customers/
+   ```
+
+Create a user first via Django Admin or `python manage.py createsuperuser`. Token is also available in Django Admin: User → Auth token.
+
+**Rate limiting:** Authenticated users 100 req/hour; anonymous 20 req/hour. Health/ready endpoints are not throttled.
+
+**Filtering, search, ordering:** List endpoints support `?search=`, `?ordering=`, and filter fields (e.g. `?status=OPEN`, `?current_risk_level=HIGH`). See API schema at `/api/schema/`.
+
 ### Customers
 - `GET /api/customers/` - لیست مشتریان
 - `POST /api/customers/` - ایجاد مشتری جدید
@@ -143,6 +166,9 @@ Regalion/
 
 ### Risk Scores
 - `GET /api/risk-scores/` - لیست امتیازهای ریسک
+
+### Audit Log (compliance)
+- `GET /api/audit-log/` - لیست خواندنی و صفحه‌بندی‌شده رویدادهای audit (فقط خواندن)
 
 ## تست
 

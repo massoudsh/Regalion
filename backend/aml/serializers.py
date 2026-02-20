@@ -2,7 +2,7 @@
 DRF Serializers for AML models
 """
 from rest_framework import serializers
-from .models import Customer, Transaction, Alert, RiskScore, Rule, Report
+from .models import Customer, Transaction, Alert, RiskScore, Rule, Report, AuditLog
 
 
 class CustomerSerializer(serializers.ModelSerializer):
@@ -95,6 +95,17 @@ class ReportSerializer(serializers.ModelSerializer):
             'period_start', 'period_end', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'report_id', 'created_at', 'updated_at']
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    """Read-only serializer for audit log (compliance API)."""
+    class Meta:
+        model = AuditLog
+        fields = [
+            'id', 'timestamp', 'method', 'path', 'user', 'ip_address',
+            'status_code', 'user_agent', 'request_body'
+        ]
+        read_only_fields = fields
 
 
 class MonitorTransactionSerializer(serializers.Serializer):

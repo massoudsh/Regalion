@@ -11,10 +11,10 @@ from django.db.models import Q
 from django.http import FileResponse
 from django.shortcuts import render
 
-from .models import Customer, Transaction, Alert, RiskScore, Rule, Report
+from .models import Customer, Transaction, Alert, RiskScore, Rule, Report, AuditLog
 from .serializers import (
     CustomerSerializer, TransactionSerializer, AlertSerializer,
-    RiskScoreSerializer, RuleSerializer, ReportSerializer,
+    RiskScoreSerializer, RuleSerializer, ReportSerializer, AuditLogSerializer,
     MonitorTransactionSerializer, ReviewAlertSerializer, GenerateReportSerializer
 )
 from .services.transaction_monitor import get_transaction_monitor
@@ -41,7 +41,11 @@ class CustomerViewSet(viewsets.ModelViewSet):
     serializer_class = CustomerSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = 'customer_id'
-    
+    filterset_fields = ['current_risk_level', 'customer_type', 'is_active', 'country']
+    search_fields = ['customer_id', 'first_name', 'last_name', 'email', 'national_id']
+    ordering_fields = ['created_at', 'registration_date', 'risk_score', 'current_risk_level']
+    ordering = ['-created_at']
+
     def get_queryset(self):
         queryset = Customer.objects.all()
         
@@ -98,7 +102,11 @@ class TransactionViewSet(viewsets.ModelViewSet):
     serializer_class = TransactionSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = 'transaction_id'
-    
+    filterset_fields = ['transaction_type', 'status', 'is_suspicious', 'currency']
+    search_fields = ['transaction_id', 'sender_account', 'receiver_account', 'receiver_name']
+    ordering_fields = ['transaction_date', 'amount', 'created_at']
+    ordering = ['-transaction_date']
+
     def get_queryset(self):
         queryset = Transaction.objects.all()
         
@@ -174,7 +182,11 @@ class AlertViewSet(viewsets.ModelViewSet):
     serializer_class = AlertSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = 'alert_id'
-    
+    filterset_fields = ['status', 'severity']
+    search_fields = ['alert_id', 'title', 'description']
+    ordering_fields = ['created_at', 'risk_score', 'severity']
+    ordering = ['-created_at']
+
     def get_queryset(self):
         queryset = Alert.objects.all()
         
@@ -233,7 +245,10 @@ class RiskScoreViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = RiskScore.objects.all()
     serializer_class = RiskScoreSerializer
     permission_classes = [IsAuthenticated]
-    
+    filterset_fields = ['score_type']
+    ordering_fields = ['calculated_at', 'score']
+    ordering = ['-calculated_at']
+
     def get_queryset(self):
         queryset = RiskScore.objects.all()
         
@@ -255,7 +270,11 @@ class RuleViewSet(viewsets.ModelViewSet):
     queryset = Rule.objects.all()
     serializer_class = RuleSerializer
     permission_classes = [IsAuthenticated]
-    
+    filterset_fields = ['status', 'rule_type']
+    search_fields = ['name', 'description']
+    ordering_fields = ['priority', 'created_at', 'risk_weight']
+    ordering = ['priority', '-created_at']
+
     def get_queryset(self):
         queryset = Rule.objects.all()
         
@@ -281,7 +300,11 @@ class ReportViewSet(viewsets.ModelViewSet):
     serializer_class = ReportSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = 'report_id'
-    
+    filterset_fields = ['report_type', 'status', 'file_format']
+    search_fields = ['report_id', 'title', 'regulatory_body']
+    ordering_fields = ['created_at', 'submitted_at']
+    ordering = ['-created_at']
+
     def get_queryset(self):
         queryset = Report.objects.all()
         
@@ -420,6 +443,19 @@ class ReportViewSet(viewsets.ModelViewSet):
         return Response(ReportSerializer(report).data)
 
 
+# --- Audit log (read-only, paginated, for compliance) ---
+
+
+class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """Read-only list of audit log entries (compliance API)."""
+    queryset = AuditLog.objects.all()
+    serializer_class = AuditLogSerializer
+    permission_classes = [IsAuthenticated]
+    filterset_fields = ['method', 'path', 'user', 'status_code']
+    ordering_fields = ['timestamp', 'path', 'status_code']
+    ordering = ['-timestamp']
+
+
 # --- Health & readiness (no auth for load balancers) ---
 
 from rest_framework.views import APIView
@@ -429,6 +465,7 @@ from django.db import connection
 class HealthView(APIView):
     """GET /api/health/ — liveness (app is up)."""
     permission_classes = [AllowAny]
+    throttle_classes = []  # No rate limit for load balancers
 
     def get(self, request):
         return Response({'status': 'ok', 'service': 'regalion-aml'})
@@ -437,6 +474,7 @@ class HealthView(APIView):
 class ReadyView(APIView):
     """GET /api/ready/ — readiness (app can serve traffic, DB reachable)."""
     permission_classes = [AllowAny]
+    throttle_classes = []  # No rate limit for load balancers
 
     def get(self, request):
         try:

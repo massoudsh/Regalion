@@ -1,11 +1,12 @@
 """
 URL configuration for Regalion AML System.
 """
-from django.contrib import admin
 from django.urls import path, include
 from rest_framework.schemas import get_schema_view
 from rest_framework.permissions import AllowAny
+from rest_framework.authtoken.views import obtain_auth_token
 from aml.views import dashboard_view
+from aml.admin import aml_admin_site
 
 schema_view = get_schema_view(
     title='Regalion AML API',
@@ -16,8 +17,9 @@ schema_view = get_schema_view(
 
 urlpatterns = [
     path('', dashboard_view),
-    path('admin/', admin.site.urls),
+    path('admin/', aml_admin_site.urls),
     path('api/schema/', schema_view),
+    path('api/auth/token/', obtain_auth_token),
     path('api/', include('aml.urls')),
 ]
 

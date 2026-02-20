@@ -325,3 +325,31 @@ class Report(models.Model):
     def __str__(self):
         return f"{self.report_id} - {self.report_type} - {self.status}"
 
+
+class AuditLog(models.Model):
+    """
+    Audit log for API requests (compliance). Written by AuditTrailMiddleware.
+    Read-only via API for compliance reporting.
+    """
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    method = models.CharField(max_length=10)
+    path = models.CharField(max_length=500, db_index=True)
+    user = models.CharField(max_length=150, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    status_code = models.PositiveSmallIntegerField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True)
+    request_body = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['-timestamp']),
+            models.Index(fields=['path']),
+            models.Index(fields=['user']),
+        ]
+        verbose_name = 'Audit log entry'
+        verbose_name_plural = 'Audit log'
+
+    def __str__(self):
+        return f"{self.timestamp.isoformat()} {self.method} {self.path} {self.status_code}"
+

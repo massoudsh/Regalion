@@ -34,6 +34,8 @@ Timeline and priorities for development, UI/UX, and enhancements. Use this with 
 
 **Reminder:** Week 3 — auth and filters done. Week 4 — Celery task and audit API done.
 
+**Done:** #11 Token auth, #12 Filtering/search/ordering (django-filter + SearchFilter + OrderingFilter), #13 Rate limiting (UserRateThrottle 100/h, AnonRateThrottle 20/h), #16 Audit log API (read-only paginated `GET /api/audit-log/`). **Open:** #14 Celery async monitor, #15 Bulk export.
+
 **GitHub issues:** #11 Token auth, #12 Filtering/search/ordering, #13 Rate limiting, #14 Celery async monitor, #15 Bulk export, #16 Audit log API.
 
 ---

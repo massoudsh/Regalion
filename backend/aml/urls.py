@@ -12,6 +12,7 @@ router.register(r'alerts', views.AlertViewSet, basename='alert')
 router.register(r'risk-scores', views.RiskScoreViewSet, basename='riskscore')
 router.register(r'rules', views.RuleViewSet, basename='rule')
 router.register(r'reports', views.ReportViewSet, basename='report')
+router.register(r'audit-log', views.AuditLogViewSet, basename='auditlog')
 
 urlpatterns = [
     path('health/', views.HealthView.as_view()),
